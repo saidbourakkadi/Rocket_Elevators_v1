@@ -1,0 +1,404 @@
+
+
+ALGORITHME ControllerElevatorsResidential
+//======================================== Definitions ===================================================
+ 
+Battery             :[ ON or OFF] He is the general controller of the elevator dispatch 
+                        she has a stack of column // we have one
+Column              : [ACTIVE or INACTIVE] she has a stack of elevator cage
+                     // we have one in this algorithme
+Cage                : identifier by [numCage, IDLE, UP, DOWN, LOADING[weigth], SERVICE[actif,inactif]
+                        // 2 cages in this model
+Door                : Can be OPEN or CLOSED (normally we have 2 doors cage_door and floor_cage
+                        but both of thme have a same position and the same command to move) 
+                        //2 cageDoors + 20 cageFloor 
+level               : position of floor when cage is 
+Direction           : Can be UP or DOWN
+boutonCallCageUp    : Floor button can call the cage for move up
+boutonCallCageDown  : Floor button can call the cage for move move down
+buttonChoixFloor      : cage button in the cage (we have 10 buttons by cage) for ask the destination floor
+
+Door Open Button    : Can request a delay to the close door timer
+Door Close Button   : Can request to close the door
+SensorWeight        : Detects weight load of the current cage
+SensorDoor          : Either be CLEAR or OBSTRUCTED
+SensorFire          :  Either be actif or inactif
+    
+ALGORITHME ControllerElevatorsResidential
+    //'----------------------------START Variables and definitions----------------------------------'
+       
+    <sequence batterie off variables declaration>
+    batterie IS A LIST OF BATTERIES IDENTIFIER BY: 
+        BatterieNumber[1] <- 1 AND 
+        STATUS_OPERATIONNEL[on,off] <- off AND
+        ledPowerBatterie <- off
+        COLUMN IS A LIST OF COLOMNS IDENTIFIED BY:
+            columnNumber["1"] <- 1 AND
+            Column_OPERATIONNAL[ON,OFF] <- OFF
+            ledPowerColoumn IS Boolean <- false
+            cages[1,2] IS A LIST OF CAGES IDENTIFIED BY 
+                FOR i NUMBER START 1 to 2
+                    cageNumber("i") <- i AND
+                    ledPowerColumn[on,off] <- off AND
+                    position_X_door_CLOSE IS  NUMBER ("px") <- 150 //positionX de la FLOOR si fermer
+                    position_x_door_OPEN IS   NUMBER ("px") <- 0 //positionX de la FLOOR si ouverte
+                    step_mvt_door IS NUMBER (px) <- 50 // pas d incrementation en fonction la vitesse
+                    STATUS_OPERATIONNEL[ON,OFF] <- OFF AND
+                    STATUS_MOUVEMENT[IDLE,UP,DOWN] <- IDLE AND 
+                    position_INITIAL_FLOOR[NUMBER entre 1 to 10] <- 0 AND
+                    position_FLOOR_Y[NUMBER entre 1 to 10] <- 0 AND
+                    weightMax[NUMBER en 'lbs'] <- 3000 AND
+                    weightLoad[NUMBER en 'lbs'] <- 0 AND
+                    increment i (pas de 1) AND
+                    buttonChoixFloor  IS A LIST OF BUTTON IDENTIFIED BY
+                        FOR j IS NUMBER  1 to 10 
+                            buttonChoixFloor("j")    <- j
+                            ScreenbuttonChoixFloor[j] <- off AND
+                            STATUS[on,off] <- off
+                            j increment (STEP 1)
+                        END FOR AND
+                    buttonAlarm IS BOOLEAN  <- off AND
+                    ScreenButtomAlarm <- off AND
+                    buttonOpenDoor IS BOOLEAN    <- off AND
+                    ScreenbuttomOpenDoor <- off AND
+                    buttonCloseDoor IS BOOLEAN   <- off AND
+                    ScreenbuttomCloseDoor <- off AND
+                    //Detect weight load of the current cage AND RETURN Status[load, unload]
+                    MaxWeight IS NUMBER <- 3000 ('lbs')
+                    WeightSensor[load, unload] <- unload
+                    // detect some things OBSTRUCTED and stay the doors open if true for the security 
+                    DoorSensor[true, false] <- false
+                    //detect fire and eject water and stop in the next door and open doors and stay doorsOpen 
+                    FireSensor[true, false] <- false
+                    
+                                                                     
+                END FOR    
+
+            buttomAskCage IS LISTE OF buttomS
+                FOR i IS NUMBER FROM 1 to 10
+                    buttomFloor("i")    <- i
+                    status IS BOOLEAN <- off
+                    i increment (pas de 1)
+                END FOR
+
+            doorFloor IS LISTE OF doorFloors IDENTIFIED BY //list 20 doorFloors
+                FOR i IS NUMBER FROM 1 to 20
+                    doorFloorNumber[1-20] <- i
+                    //status: [open,close] <- close
+                    position_X_FLOOR_close IS NUMBER ("px") <- 150 //positionX de la FLOOR si fermer
+                    position_x_FLOOR_open IS   NUMBER ("px") <- 0 //positionX de la FLOOR si ouverte
+                    step_mvt_FLOOR IS  NUMBER (px) <- 50// pas d incrementation en fonction la vitesse supFLOORr par les moteurs
+                    i increment (pas de 1)
+                    screen_Floor[on,off] <- off
+                    DisplayScreenFloo[1-10] <- 0
+                    
+                END FOR
+            
+            
+    event IS BOOLEAN  <- false
+    testOperability IS BOOLEAN <- false
+    <END SEQUENCE> n
+
+
+
+    
+    //'----------------------------START batterie----------------------------------'
+    //'<----- batterie initialised variables declared width all tests------------->'
+    
+    <sequence Powerbatterie(event) use event>
+    
+    if event
+        BatterieNumber[1] <- 1 AND 
+        STATUS_OPERATIONNEL[on,off] <- on AND
+        ledPowerBatterie <- on
+        COLUMN IS A LIST OF COLOMNS IDENTIFIED BY:
+            columnNumber["1"] <- 1 AND
+            Column_OPERATIONNAL[ON,OFF] <- on
+            ledPowerColoumn <- on
+            // its supposed create separate variables(cage1 and cage2 etc..) and initialised after
+            cages[1,2] IS A LIST OF CAGES IDENTIFIED BY 
+                FOR i NUMBER START 1 to 2
+                    cageNumber("i") <- i AND
+                    ledPowerColumn[on,off] <- on AND
+                    position_X_door_CLOSE IS  NUMBER ("px") <- 150 //positionX de la FLOOR si fermer
+                    position_x_door_OPEN IS   NUMBER ("px") <- 0 //positionX de la FLOOR si ouverte
+                    step_mvt_door IS NUMBER (px) <- 50 // pas d incrementation en fonction la vitesse
+                    STATUS_OPERATIONNEL[ON,OFF] <- OFF AND
+                    STATUS_MOUVEMENT[IDLE,UP,DOWN] <- IDLE AND 
+                    position_INITIAL_FLOOR[NUMBER entre 1 to 10] <- 0 AND
+                    position_FLOOR_Y[NUMBER entre 1 to 10] <- 0 AND
+                    weightMax[NUMBER en 'lbs'] <- 3000 AND
+                    weightLoad[NUMBER en 'lbs'] <- 0 AND
+                    increment i (pas de 1) AND
+                    buttonChoixFloor  IS A LIST OF BUTTON IDENTIFIED BY
+                        FOR j IS NUMBER START 1 to 10 
+                            buttonChoixFloor("j")    <- j
+                            ScreenbuttonChoixFloor[j] <- off AND
+                            STATUS[on,off] <- off
+                            j increment (STEP 1)
+                        END FOR AND
+                    buttomAlarm IS BOOLEAN  <- off AND
+                    ScreenButtomAlarm <- on AND
+                    buttomOpenDoor IS BOOLEAN    <- off AND
+                    ScreenbuttomOpenDoor <- on AND
+                    buttomCloseDoor IS BOOLEAN   <- off AND
+                    ScreenbuttomCloseDoor <- on AND
+                    //Detect weight load of the current cage AND RETURN Status[load, unload]
+                    MaxWeight IS NUMBER <- 3000 ('lbs')
+                    WeightSensor[load, unload] <- unload
+                    // detect some things OBSTRUCTED and stay the doors open if true for the security 
+                    DoorSensor[true, false] <- false
+                    //detect fire and eject water and stop in the next door and open doors and stay doorsOpen 
+                    FireSensor[true, false] <- false
+                    
+                                                                     
+                END FOR    
+
+            buttomAskCage IS LISTE OF buttomS
+                FOR i IS NUMBER FROM 1 to 10
+                    buttomFloor("i")    <- i
+                    status[on or off] <- off
+                    ledButtomAskCage[on,off] TO ON
+                    i increment (pas de 1)
+                END FOR
+
+            doorFloor IS LISTE OF doorFloors IDENTIFIED BY //list 20 doorFloors
+                FOR i IS NUMBER FROM 1 to 20
+                    doorFloorNumber[1-20] <- i
+                    //status: [open,close] <- close
+                    position_X_FLOOR_close IS NUMBER ("px") <- 150 //positionX de la FLOOR si fermer
+                    position_x_FLOOR_open IS   NUMBER ("px") <- 0 //positionX de la FLOOR si ouverte
+                    step_mvt_FLOOR IS  NUMBER (px) <- 50// pas d incrementation en fonction la vitesse supFLOORr par les moteurs
+                    i increment (pas de 1)
+                    screen_Floor[on,off] <- off
+                    DisplayScreenFloo[1-10] <- 0
+                    
+                END FOR
+            
+    call TestOperabilityCages()   return <- true    
+    event IS BOOLEAN  <- true
+    testOperability IS BOOLEAN <- true
+       
+    else
+        batterie <- off
+        return event, batterie
+    end if
+    <END SEQUENCE>
+    
+<sequence TestsOperabilityCage(event,batterie)>
+    
+        return liste des cages Actifs
+        WRITE le status ACTIF OR INACTIF of each cage
+        for each cage in cage
+        Call move_cage(use cageNumber and position_FLOOR_Y <- 0)
+        end for 
+    
+<END SEQUENCE>    
+
+--------------------------------------------------------------------------------------------------------------
+So as I was working on the project I lost so mush time setting all the parameters, I thought that at this point 
+making it working in a simplifying way is more accurate. 
+
+To make it easier, we will used somes setting parameters for this algothm and 
+can to do some scenarios
+--------------------------Decision parameters:-----------------------------------------------------------------
+cages:      numCages, level, (idle, up, down), (Weigthload <3000 lbs), // j ai 2 cages
+
+numCage	idle	up	down	weigth>3000	actif/inactif	levelActuel	arretDemande	door(open/close)
+1       0       1    0           0           1               2           5               close
+2       0        1   0           0           1               1          3               close
+boutonCallCageUp (10 buttons)									
+1	2	3	4	5	6	7	8	9	10
+                
+boutonCallCageDown	( 10 buttons)								
+1	2	3	4	5	6	7	8	9	10
+                1                       //1
+        1                               //2
+                        7               //2
+buttomAskCage                        
+---------------------------------------------------------------------------------------------------------------
+
+<SEQUENCE boutonCallCageUp_pressed>
+        
+        SET buttomAskCage TO ON
+        SET ledButtomAskCage TO ON
+        READ boutonCallCageDown,
+        READ cage1.levelactuel,
+        READ cage2.levelactuel
+        READ cage.status must be ACTIF
+        call choice_best_cage_up with all this parameters
+       
+<END SEQUENCE >
+
+<SEQUENCE boutonCallCageDown_pressed>
+       
+    SET buttomAskCage TO ON
+    SET ledButtomAskCage TO ON
+    READ boutonCallCageDown,
+    READ cage1.levelactuel,
+    READ cage2.levelactuel
+    READ cage.status must be ACTIF
+    call choice_best_cage_down with all this parameters
+       
+<END SEQUENCE >
+
+
+< SEQUENCE choice_best_cage_up >
+    SET Beststep to 0, beststepcage1 to 0, beststepcage2 to 0
+    READ  all parameters we receive than buttonAskCage 
+    For cage in numcages 
+        SET  idle.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value) ADD
+            up.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value) ADD
+            down.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value ADD 
+            beststepcagei)
+        TO bestStep        
+    end for                     
+        SET bestStep to stepCage1 substract stepcage2
+        IF beststep LESS OR EQUAL TO 0 
+            SET cage1.up TO 1
+            SET cage1.down TO 0
+            SET cage1.idel TO  0
+            SET Weigthload TO CALCULATED_WEIGHT
+            SET cage1.arretdemande TO boutonCallCageDown
+            SET beststep TO stepcage1
+            RETURN beststep AND stepcage1
+            call moveUp() 
+        else
+            SET cage2.up TO  1
+            SET cage2.down TO 0
+            SET cage2.idel TO  0
+            SET cage2.arretdemande TO boutonCallCageDown
+            SET beststep TO stepcage2
+            return beststep
+            call moveUp()
+
+        end if
+
+    end for
+   
+< END SEQUENCE  >
+
+< SEQUENCE choice_best_cage_down >
+    SET Beststep to 0, beststepcage1 to 0, beststepcage2 to 0
+    READ  all parameters we receive than buttonAskCage 
+    For cage in numcages 
+        SET  idle.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value) ADD
+            up.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value) ADD
+            down.value*(boutonCallCageDown.value SUBSTRACT cagei.levelActuel.value ADD 
+            beststepcagei)
+        TO bestStep        
+    end for                     
+        SET bestStep to stepCage1 substract stepcage2
+        IF beststep LESS OR EQUAL TO 0 
+            SET cage1.up TO 0
+            SET cage1.down TO 1
+            SET cage1.idel TO  0
+            SET Weigthload TO CALCULATED_WEIGHT
+            SET cage1.arretdemande TO boutonCallCageDown
+            SET beststep TO stepcage1
+            RETURN beststep AND stepcage1
+            call moveDown() 
+        else
+            SET cage2.up TO  0
+            SET cage2.down TO 1
+            SET cage2.idel TO  0
+            SET cage2.arretdemande TO boutonCallCageDown
+            SET beststep TO stepcage2
+            return beststep
+            call moveDown()
+
+        end if
+
+    end for
+   
+< END SEQUENCE choice_best_cage >
+
+<SEQUENCE move_cage_up>
+    READ cagei, arretdemande,cage1.up,cage1.down,cage1.idle, bestStep
+    for levelActuel to boutonCallCageDown
+    read boutonCallCageDown
+    ADD [boutonCallCageDown] in listQUEUE []  and sort in decreasing order
+        if cagei.up EQUAL 1
+            SET cage1.levelActuel TO  levelactuel ADD 1 
+            SET bestStep TO bestStep SUBSTRACT 1
+            RETURN beststep
+       
+        End if
+    END FOR    
+        SET cagei.idle TO 1
+        SET cagei.up TO 0
+        SET cagei.down TO 0
+        SET call open_door timer 8s
+        SET call close_door timer 8s
+        READ buttomChoixFloor 
+        SET buttomChoixFloor TO ON
+        SET ledbuttomChoixFloor TO ON
+        ADD [buttomChoixFloor] in listQUEUE []  and sort in decreasing order
+       
+<END SEQUENCE >
+  
+
+<SEQUENCE move_Cage_down>
+    READ cagei, arretdemande,cage1.up,cage1.down,cage1.idle, bestStep
+    for levelActuel to boutonCallCageDown
+    ADD [boutonCallCageDown] in listQUEUE []  and sort in decreasing order
+        if cagei.down EQUEAL 1
+            SET levelActuel TO  levelactuel SUBSTRACT 1
+            bestStepTO bestStep SUBSTRACT 1
+            return beststep
+        end if
+    end for    
+        SET cagei.idle TO 1
+        SET cagei.up TO 0
+        SET cagei.down TO 0
+        SET call open_door timer 8s
+        SET call close_door timer 8s
+        READ buttomChoixFloor 
+        SET buttomChoixFloor TO ON
+        SET ledbuttomChoixFloor TO ON
+        ADD [buttomChoixFloor] in listQUEUE []  and sort in decreasing order
+<END SEQUENCE>
+
+< SEQUENCE opendoor >
+
+    SET  position_x_door_OPEN  TO 0 USE a DELAY of 8 seconds
+    
+    CALL close_door 
+
+<END SEQUENCE opendoor>
+
+< SEQUENCE closedoor >
+    REPEAT  opendoor UNTIL DoorSensor is oFF 
+    SET  position_x_door_OPEN  TO 150 USE a DELAY of 8 seconds
+
+<END SEQUENCE closedoor>    
+
+<SEQUENCE buttomChoixFloor>
+    call move_Cage
+<END sequence>
+
+<SEQUENCE buttonAlarm>
+   send message alertto maintenance
+   if cageStatus is idle
+        call open_close_door
+    end if
+
+<END SEQUENCE>
+   
+    
+<END ControllerElevatorsResidential>
+
+<SEQUENCE buttomAskCage_pressed>
+        if the cageNumber was called with 
+        SET buttomAskCage TO ON
+        SET ledButtomAskCage TO ON
+        READ buttomAskCage,
+        READ cage.status must be ACTIF
+        insert  in list [boutonCallCageDown] and sort in decreasing order
+       
+<END SEQUENCE >
+
+
+
+
+
